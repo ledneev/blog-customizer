@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ArrowButton } from 'src/ui/arrow-button';
 import { Button } from 'src/ui/button';
 import { RadioGroup } from 'src/ui/radio-group';
@@ -15,42 +15,67 @@ import type { OptionType } from 'src/constants/articleProps';
 import { Separator } from 'src/ui/separator';
 import { Text } from 'src/ui/text';
 import styles from './ArticleParamsForm.module.scss';
+import { useClickOutside } from './hooks/useClickOutside';
+import { ArticleState } from 'src/types';
 
-export const ArticleParamsForm = () => {
-	const [isOpen, setIsOpen] = useState(false);
+interface ArticleParamsFormProps {
+	isOpen: boolean;
+	onToggle: () => void;
+	currentState: ArticleState;
+	onApply: (newState: ArticleState) => void;
+	onReset: () => void;
+}
+
+export const ArticleParamsForm: React.FC<ArticleParamsFormProps> = ({
+	isOpen,
+	onToggle,
+	currentState,
+	onApply,
+	onReset,
+}) => {
 	const formRef = useRef<HTMLDivElement>(null);
-	const [formState, setFormState] = useState({
-		fontFamily: defaultArticleState.fontFamilyOption,
-		fontSize: defaultArticleState.fontSizeOption,
-		fontColor: defaultArticleState.fontColor,
-		backgroundColor: defaultArticleState.backgroundColor,
-		contentWidth: defaultArticleState.contentWidth,
+
+	const [formState, setFormState] = useState<ArticleState>(currentState);
+
+	// Синхронизируем formState с currentState при открытии формы
+	useEffect(() => {
+		if (isOpen) {
+			setFormState(currentState);
+		}
+	}, [isOpen, currentState]);
+
+	// Клик вне формы
+	useClickOutside(formRef, () => {
+		if (isOpen) {
+			onToggle();
+		}
 	});
 
 	const toggleForm = () => {
-		setIsOpen(!isOpen);
+		onToggle();
 	};
 
 	const handleFieldChange =
-		(field: keyof typeof formState) => (value: OptionType) => {
+		(field: keyof ArticleState) => (value: OptionType) => {
 			setFormState((prev) => ({
 				...prev,
 				[field]: value,
 			}));
 		};
 
-	useLayoutEffect(() => {
-		if (!isOpen) return;
+	const handleApply = () => {
+		onApply(formState);
+	};
 
-		const handleClickOutside = (event: MouseEvent) => {
-			if (formRef.current && !formRef.current.contains(event.target as Node)) {
-				setIsOpen(false);
-			}
-		};
+	const handleReset = () => {
+		setFormState(defaultArticleState);
+		onReset();
+	};
 
-		document.addEventListener('mousedown', handleClickOutside);
-		return () => document.removeEventListener('mousedown', handleClickOutside);
-	}, [isOpen]);
+	const handleSubmit = (e: React.FormEvent) => {
+		e.preventDefault();
+		handleApply();
+	};
 
 	return (
 		<>
@@ -59,7 +84,7 @@ export const ArticleParamsForm = () => {
 				<aside
 					ref={formRef}
 					className={`${styles.container} ${styles.container_open}`}>
-					<form className={styles.form}>
+					<form className={styles.form} onSubmit={handleSubmit}>
 						<div className={styles.header}>
 							<Text size={31} weight={800} uppercase>
 								ЗАДАЙТЕ ПАРАМЕТРЫ
@@ -68,9 +93,9 @@ export const ArticleParamsForm = () => {
 						{/* 1. шрифт */}
 						<div className={styles.formSection}>
 							<Select
-								selected={formState.fontFamily}
+								selected={formState.fontFamilyOption}
 								options={fontFamilyOptions}
-								onChange={handleFieldChange('fontFamily')}
+								onChange={handleFieldChange('fontFamilyOption')}
 								title='Шрифт'
 							/>
 						</div>
@@ -78,9 +103,9 @@ export const ArticleParamsForm = () => {
 						<div className={styles.formSection}>
 							<RadioGroup
 								name='font-size'
-								selected={formState.fontSize}
+								selected={formState.fontSizeOption}
 								options={fontSizeOptions}
-								onChange={handleFieldChange('fontFamily')}
+								onChange={handleFieldChange('fontSizeOption')}
 								title='Размер шрифта'
 							/>
 						</div>
@@ -115,7 +140,12 @@ export const ArticleParamsForm = () => {
 							/>
 						</div>
 						<div className={styles.bottomContainer}>
-							<Button title='Сбросить' htmlType='reset' type='clear' />
+							<Button
+								title='Сбросить'
+								htmlType='button'
+								type='clear'
+								onClick={handleReset}
+							/>
 							<Button title='Применить' htmlType='submit' type='apply' />
 						</div>
 					</form>
